@@ -21,43 +21,56 @@ async function run() {
 }
 run().catch(console.dir);
 
-//依賴配置
+//套件配置
 const express = require("express");
 const app = express();
-const session = require("express-session");
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const PORT = 3000;
+const SECRET_KEY = "key";
 app.set("view engine", "ejs");
 app.set("views", "./views");
-app.use(session({
-    secret: "key",
-    resave: false,
-    saveUninitialized: true
-}));
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type"]
+    allowedHeaders: ["Content-Type", "Authorization"]
 }));
 app.use(express.json());
 let todos = [];
+let datas;
 
-async function loadTodo(){
+//JWT驗證
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token == null) return res.sendStatus(401);
+
+    jwt.verify(token, SECRET_KEY, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+}
+
+//有關CRUD的路由最後都要重新讀取資料庫的檔案
+async function loadTodo(email){
     try{
-        const collection = db.collection("todos");
-        todos = await collection.find({}).toArray();  
+        const collection = db.collection("member");
+        datas = await collection.findOne({
+            email: email
+        })  
     }catch(err){
         console.log(err);
     }
 } 
 //路由配置
-app.get("/", async (req, res) => {
+app.get("/", authenticateToken, async (req, res) => {
     try{
-        await loadTodo();
+        await loadTodo(req.user.email);
         res.status(200).json({
             status: "success",
-            data: todos
+            data: datas
         });
     }catch{
         res.status(500).json({
@@ -68,25 +81,31 @@ app.get("/", async (req, res) => {
 });
 app.post("/", async (req, res) => {
     try{
-        const { title } = req.body;
-        if(title){
-            const collection = db.collection("todos");
-            await collection.insertOne({
-                id: uuidv4(),
-                title,
-                done: false
-            });
-            await loadTodo();
-            res.status(200).json({
-                status: "success",
-                data: todos
-            });   
-        }else{
-            res.status(400).json({
-                status: "fail",
-                message: "需要填寫待辦事項"
-            });
+        const { title, email } = req.body;
+        const collection = db.collection("member");
+        let result = await collection.findOne({
+            email
+        })
+        let todos = result.todos;
+        let todo = {
+            id: uuidv4(),
+            title,
+            done: false
         }
+        todos.push(todo);
+        await collection.updateOne(
+            {
+                email: email
+            },{
+                $set: {
+                    todos: todos
+                }
+            }
+        );
+        await loadTodo(email);
+        res.status(200).json({
+            status: "success",
+        });    
     }catch{
         res.status(500).json({
             status: "fail",
@@ -96,18 +115,30 @@ app.post("/", async (req, res) => {
 })
 app.delete("/:id", async (req, res) => {
     const id = req.params.id;
+    const email = req.query.email;
     if(id == "" || id == undefined || id == null){
         return;
     }
     try{
-        const collection = db.collection("todos");
-        await collection.deleteOne({
-            id: id
+        const collection = db.collection("member");
+        let result = await collection.findOne({
+            email: email
         })
-        await loadTodo();
+        let todos = result.todos;
+        let index = todos.findIndex(todo => todo.id === id );
+        todos.splice(index, 1);
+        await collection.updateOne(
+            {
+                email: email
+            },{
+                $set: {
+                    todos: todos
+                }
+            }
+        );
+        await loadTodo(email);
         res.status(200).json({
             status: "success",
-            data: todos
         });
     }catch{
         res.status(404).json({
@@ -116,9 +147,9 @@ app.delete("/:id", async (req, res) => {
         });
     }
 });
-app.patch("/:id/title", async(req, res) => {
+app.patch("/title/:id", async(req, res) => {
     const id = req.params.id;
-    const {title} = req.body;
+    const { title, email } = req.body;
     if(!id || !title){
         res.status(400).json({
             status: "fail",
@@ -127,20 +158,27 @@ app.patch("/:id/title", async(req, res) => {
         return;
     }
     try{
-        const collection = db.collection("todos");
+        const collection = db.collection("member");
+        let result = await collection.findOne(
+            {
+                email: email
+            }
+        );
+        let todos = result.todos;
+        let index = todos.findIndex(todo => todo.id === id);
+        todos[index].title = title;
         await collection.updateOne(
             {
-                id: id
+                email: email
             },{
                 $set: {
-                    title: title
+                    todos: todos
                 }
             }
         );
         await loadTodo();
         res.status(200).json({
             status: "success",
-            data: todos
         })
     }catch{
         res.status(404).json({
@@ -149,38 +187,33 @@ app.patch("/:id/title", async(req, res) => {
         })
     }
 })
-app.patch("/:id/done", async (req, res) => {
+app.patch("/done/:id", async (req, res) => {
     const id = req.params.id;
+    const email = req.query.email
     try{
-        const collection = db.collection("todos");
+        const collection = db.collection("member");
         let result = await collection.findOne({
-            id: id
+            email: email
         })
-        if(result.done){
-            await collection.updateOne(
-                {
-                    id: id
-                },{
-                    $set: {
-                        done: false
-                    }
-                }
-            )
+        let todos = result.todos;
+        let index = todos.findIndex(todo => todo.id === id);
+        if(todos[index].done){
+            todos[index].done = false;
         }else{
-            await collection.updateOne(
-                {
-                    id: id
-                },{
-                    $set: {
-                        done: true
-                    }
+            todos[index].done = true;
+        }
+        await collection.updateOne(
+            {
+                email: email
+            },{
+                $set: {
+                    todos: todos
                 }
-            )
-        }  
-        await loadTodo();
+            }
+        );
+        await loadTodo(email);
         res.status(200).json({
             status: "success",
-            data: todos
         });
     }catch{
         res.status(404).json({
@@ -189,7 +222,80 @@ app.patch("/:id/done", async (req, res) => {
         });
     }
 });
-
+app.post("/signup", async (req, res) => {
+    const datas = req.body;
+    const { userName, email, password, number, date, birthday, todos } = datas;
+    try{
+        const collection = db.collection("member");
+        let result = await collection.findOne({
+            email: email
+        })
+        if(result === null){
+            await collection.insertOne({
+                userName,
+                email,
+                password,
+                number,
+                date,
+                birthday,
+                todos
+            })
+            res.status(200).json({
+                status: "success"
+            })
+        }else{
+            res.status(400).json({
+                status: "fail",
+                message: "信箱已存在"
+            })
+        }
+    }catch(err){
+        console.log(err);
+        res.status(500).json({
+            status: "fail",
+            message: "伺服器錯誤"
+        })
+    }   
+});
+app.post("/login", async (req, res) => {
+    const datas = req.body;
+    const { email, password } = datas;
+    try{
+        const collection = db.collection("member");
+        let user = await collection.findOne({
+            $and: [
+                {email: email},
+                {password: password}
+            ]
+        })
+        if(user){
+            //創建JWT
+            const token = jwt.sign(
+                { id: user._id, email: user.email},
+                SECRET_KEY,
+                { expiresIn: "1h" }
+            );
+            res.status(200).json({
+                status: "success",
+                token: token
+            })
+        }else{
+            res.status(404).json({
+                status: "fail",
+                message: "找不到此帳號或密碼"
+            })
+        }
+    }catch(err){
+        console.log(err);
+        res.status(500).json({
+            status: "fail",
+            message: "伺服器錯誤"
+        })
+    }
+});
+app.get("*", (req, res) => {
+    res.status(404).send("404 Not Found");
+});
 app.listen(PORT, () => {
-    console.log(`正在聆聽localhost${PORT}`);
+    console.log(`啟動伺服器localhost${PORT}`);
 });
