@@ -4,8 +4,8 @@ const uri = "mongodb+srv://a41522001:a41522001@cluster0.o8y0mnv.mongodb.net/?ret
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
-        strict: true,
-        deprecationErrors: true,
+        // strict: true,
+        // deprecationErrors: true,
     }
 });
 let db = null;
