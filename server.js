@@ -35,7 +35,6 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
 app.use(express.json());
-let todos = [];
 let datas;
 
 //JWT驗證

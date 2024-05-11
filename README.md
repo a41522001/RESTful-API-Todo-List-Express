@@ -11,3 +11,7 @@
 <p>原先抓取會員資料時使用的是session來驗證資訊</p>
 <p>後來發現關於cookie的問題還有cors的同源政策沒辦法由前端來驗證</p>
 <p>才採用沒用過的JWT驗證並學習如何正確使用</p>
+<h3>連結:</h3>
+<a href="https://github.com/a41522001/RESTful-API-Todo-List">前端Github連結</a>
+<a href="https://todolist-test-5x2t.onrender.com">專案連結</a>
+<p>第一次登入時要等一下伺服器連接</p>
