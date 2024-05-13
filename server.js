@@ -293,7 +293,8 @@ app.post("/login", async (req, res) => {
     }
 });
 app.post("/forgetPassword", async (req, res) => {
-    const { email, number } = req.body;
+    const datas = req.body;
+    const { email, number } = datas;
     console.log(email, number);
     try{
         if(email || number){
@@ -304,13 +305,13 @@ app.post("/forgetPassword", async (req, res) => {
                     {number: number}
                 ]
             });
-            let password;
+            console.log(result);
             if(result !== null){
-                password = result.password;
+                result.password;
                 console.log(password);
                 res.status(200).json({
                     status: "success",
-                    data: password
+                    data: result.password
                 });
             }else{
                 res.status(200).json({
@@ -324,7 +325,8 @@ app.post("/forgetPassword", async (req, res) => {
                 message: "請填寫正確的帳號和手機號碼"
             })
         }
-    }catch{
+    }catch(err){
+        console.log(err);
         res.status(500).json({
             status: "fail",
             message: "伺服器錯誤"
