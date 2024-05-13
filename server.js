@@ -309,7 +309,7 @@ app.post("/forgetPassword", async (req, res) => {
             if(result !== null){
                 res.status(200).json({
                     status: "success",
-                    data: result.password
+                    data: `您的密碼是: ${result.password}`
                 });
             }else{
                 res.status(200).json({
