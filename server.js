@@ -307,7 +307,6 @@ app.post("/forgetPassword", async (req, res) => {
             });
             console.log(result);
             if(result !== null){
-                result.password;
                 res.status(200).json({
                     status: "success",
                     data: result.password
