@@ -292,6 +292,45 @@ app.post("/login", async (req, res) => {
         })
     }
 });
+app.post("/forgetPassword", async (req, res) => {
+    const { email, number } = req.body;
+    console.log(email, number);
+    try{
+        if(email || number){
+            const collection = db.collection("member");
+            let result = await collection.findOne({
+                $and: [
+                    {email: email},
+                    {number: number}
+                ]
+            });
+            let password;
+            if(result !== null){
+                password = result.password;
+                console.log(password);
+                res.status(200).json({
+                    status: "success",
+                    data: password
+                });
+            }else{
+                res.status(200).json({
+                    status: "fail",
+                    data: "找不到此帳號或手機號碼"
+                })
+            }  
+        }else{
+            res.status(404).json({
+                status: "fail",
+                message: "請填寫正確的帳號和手機號碼"
+            })
+        }
+    }catch{
+        res.status(500).json({
+            status: "fail",
+            message: "伺服器錯誤"
+        })
+    }
+});
 app.get("*", (req, res) => {
     res.status(404).send("404 Not Found");
 });
